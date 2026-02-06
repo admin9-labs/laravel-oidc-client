@@ -11,9 +11,11 @@ A Laravel package for OIDC (OpenID Connect) authentication with PKCE support, de
 - OIDC Authorization Code Flow with PKCE (Proof Key for Code Exchange)
 - State parameter validation for CSRF protection
 - One-time exchange codes with configurable TTL
+- Configurable user mapping (column names, userinfo→attribute mapping)
 - OidcService for Auth Server token revocation (use in your logout)
 - Configurable routes and middleware
 - Rate limiting on sensitive endpoints
+- Publishable translation files for error messages
 
 ## Requirements
 
@@ -30,17 +32,25 @@ composer require admin9/laravel-oidc-client
 ### Publish Configuration
 
 ```bash
-php artisan vendor:publish --tag="oidc-config"
+php artisan vendor:publish --tag="oidc-client-config"
 ```
 
 ### Publish Migrations
 
 ```bash
-php artisan vendor:publish --tag="oidc-migrations"
+php artisan vendor:publish --tag="oidc-client-migrations"
 php artisan migrate
 ```
 
+### Publish Translations (optional)
+
+```bash
+php artisan vendor:publish --tag="oidc-client-translations"
+```
+
 ## Configuration
+
+The config key is `oidc-client` (to avoid collision with the server package's `oidc` key when both are installed).
 
 Configure your OIDC provider in `.env`:
 
@@ -66,10 +76,10 @@ OIDC_JWT_GUARD=api
 
 ## User Model Setup
 
-Your User model needs the following fields:
+Your User model needs the following fields (column names are configurable via `user_mapping`):
 
 ```php
-// Migration
+// Migration (default column names)
 Schema::table('users', function (Blueprint $table) {
     $table->string('oidc_sub')->nullable()->unique();
     $table->text('auth_server_refresh_token')->nullable();
@@ -96,6 +106,22 @@ protected $fillable = [
 protected $hidden = [
     'password', 'auth_server_refresh_token',
 ];
+```
+
+### User Mapping Configuration
+
+Customize how OIDC userinfo claims map to your User model in `config/oidc-client.php`:
+
+```php
+'user_mapping' => [
+    'identifier_column' => 'oidc_sub',           // DB column for OIDC subject ID
+    'identifier_claim' => 'sub',                  // Userinfo claim used as identifier
+    'refresh_token_column' => 'auth_server_refresh_token',
+    'attributes' => [
+        'name' => fn ($userinfo) => $userinfo['name'] ?? $userinfo['email'],
+        'email' => fn ($userinfo) => $userinfo['email'],
+    ],
+],
 ```
 
 ## Routes
