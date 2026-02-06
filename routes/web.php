@@ -3,7 +3,7 @@
 use Admin9\OidcClient\Http\Controllers\OidcController;
 use Illuminate\Support\Facades\Route;
 
-$webConfig = config('oidc.routes.web', [
+$webConfig = config('oidc-client.routes.web', [
     'prefix' => 'auth',
     'middleware' => ['web'],
 ]);

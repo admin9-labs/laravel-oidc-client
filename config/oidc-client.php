@@ -54,6 +54,29 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | User Mapping
+    |--------------------------------------------------------------------------
+    |
+    | Configure how OIDC userinfo claims map to your local User model.
+    | - identifier_column: the DB column storing the OIDC subject ID
+    | - identifier_claim: the userinfo claim used as the unique identifier
+    | - refresh_token_column: the DB column storing the Auth Server refresh token
+    | - attributes: map of DB column => callable or userinfo key
+    |
+    */
+
+    'user_mapping' => [
+        'identifier_column' => 'oidc_sub',
+        'identifier_claim' => 'sub',
+        'refresh_token_column' => 'auth_server_refresh_token',
+        'attributes' => [
+            'name' => fn ($userinfo) => $userinfo['name'] ?? $userinfo['email'],
+            'email' => fn ($userinfo) => $userinfo['email'],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Exchange Code TTL
     |--------------------------------------------------------------------------
     |

@@ -17,29 +17,31 @@ class OidcService
      */
     public function revokeAuthServerToken($user): bool
     {
-        if (! $user || ! $user->auth_server_refresh_token) {
+        $refreshTokenColumn = config('oidc-client.user_mapping.refresh_token_column', 'auth_server_refresh_token');
+
+        if (! $user || ! $user->{$refreshTokenColumn}) {
             return true; // Nothing to revoke
         }
 
         try {
-            $httpConfig = config('oidc.http');
-            $revokeUrl = config('oidc.auth_server.host').config('oidc.endpoints.revoke');
+            $httpConfig = config('oidc-client.http');
+            $revokeUrl = config('oidc-client.auth_server.host').config('oidc-client.endpoints.revoke');
 
             $response = Http::timeout($httpConfig['timeout'] ?? 10)
                 ->withBasicAuth(
-                    config('oidc.auth_server.client_id'),
-                    config('oidc.auth_server.client_secret')
+                    config('oidc-client.auth_server.client_id'),
+                    config('oidc-client.auth_server.client_secret')
                 )
                 ->acceptJson()
                 ->asForm()
                 ->post($revokeUrl, [
-                    'token' => $user->auth_server_refresh_token,
+                    'token' => $user->{$refreshTokenColumn},
                     'token_type_hint' => 'refresh_token',
                 ]);
 
             if ($response->successful()) {
                 Log::info('OIDC: Auth Server token revoked', ['user_id' => $user->id]);
-                $user->update(['auth_server_refresh_token' => null]);
+                $user->update([$refreshTokenColumn => null]);
 
                 return true;
             }
@@ -66,8 +68,8 @@ class OidcService
      */
     public function getSsoLogoutUrl(): string
     {
-        return config('oidc.auth_server.host').config('oidc.endpoints.logout').'?'.http_build_query([
-            'post_logout_redirect_uri' => config('oidc.frontend_url'),
+        return config('oidc-client.auth_server.host').config('oidc-client.endpoints.logout').'?'.http_build_query([
+            'post_logout_redirect_uri' => config('oidc-client.frontend_url'),
         ]);
     }
 
@@ -76,6 +78,8 @@ class OidcService
      */
     public function isOidcUser($user): bool
     {
-        return $user && ! empty($user->oidc_sub);
+        $identifierColumn = config('oidc-client.user_mapping.identifier_column', 'oidc_sub');
+
+        return $user && ! empty($user->{$identifierColumn});
     }
 }

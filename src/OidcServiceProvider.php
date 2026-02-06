@@ -11,8 +11,9 @@ class OidcServiceProvider extends PackageServiceProvider
     public function configurePackage(Package $package): void
     {
         $package
-            ->name('oidc')
-            ->hasConfigFile()
+            ->name('oidc-client')
+            ->hasConfigFile('oidc-client')
+            ->hasTranslations()
             ->hasMigration('2024_01_01_000000_add_oidc_fields_to_users_table')
             ->hasRoute('web')
             ->hasRoute('api');

@@ -23,7 +23,7 @@ it('validates state parameter on callback', function () {
 it('handles authorization denial on callback', function () {
     $response = $this->get('/auth/callback?error=access_denied&error_description=User+denied+access');
 
-    $frontendUrl = config('oidc.frontend_url');
+    $frontendUrl = config('oidc-client.frontend_url');
     $response->assertRedirect();
     $response->assertRedirectContains($frontendUrl.'/auth/callback');
     $response->assertRedirectContains('error=access_denied');
@@ -46,11 +46,11 @@ it('rejects invalid exchange code', function () {
 });
 
 it('loads configuration correctly', function () {
-    expect(config('oidc.auth_server.host'))->toBe('https://auth.example.com');
-    expect(config('oidc.auth_server.client_id'))->toBe('test-client-id');
-    expect(config('oidc.auth_server.client_secret'))->toBe('test-client-secret');
-    expect(config('oidc.auth_server.redirect_uri'))->toBe('http://localhost/auth/callback');
-    expect(config('oidc.frontend_url'))->toBe('http://localhost:3000');
+    expect(config('oidc-client.auth_server.host'))->toBe('https://auth.example.com');
+    expect(config('oidc-client.auth_server.client_id'))->toBe('test-client-id');
+    expect(config('oidc-client.auth_server.client_secret'))->toBe('test-client-secret');
+    expect(config('oidc-client.auth_server.redirect_uri'))->toBe('http://localhost/auth/callback');
+    expect(config('oidc-client.frontend_url'))->toBe('http://localhost:3000');
 });
 
 it('registers routes correctly', function () {
