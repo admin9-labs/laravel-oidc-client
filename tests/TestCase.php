@@ -1,37 +1,27 @@
 <?php
 
-namespace VendorName\Skeleton\Tests;
+namespace Admin9\OidcClient\Tests;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
-use Orchestra\Testbench\TestCase as Orchestra;
-use VendorName\Skeleton\SkeletonServiceProvider;
+use Admin9\OidcClient\OidcServiceProvider;
+use Orchestra\Testbench\TestCase as BaseTestCase;
 
-class TestCase extends Orchestra
+abstract class TestCase extends BaseTestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        Factory::guessFactoryNamesUsing(
-            fn (string $modelName) => 'VendorName\\Skeleton\\Database\\Factories\\'.class_basename($modelName).'Factory'
-        );
-    }
-
-    protected function getPackageProviders($app)
+    protected function getPackageProviders($app): array
     {
         return [
-            SkeletonServiceProvider::class,
+            OidcServiceProvider::class,
         ];
     }
 
-    public function getEnvironmentSetUp($app)
+    protected function defineEnvironment($app): void
     {
-        config()->set('database.default', 'testing');
-
-        /*
-         foreach (\Illuminate\Support\Facades\File::allFiles(__DIR__ . '/../database/migrations') as $migration) {
-            (include $migration->getRealPath())->up();
-         }
-         */
+        $app['config']->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
+        $app['config']->set('oidc.auth_server.host', 'https://auth.example.com');
+        $app['config']->set('oidc.auth_server.client_id', 'test-client-id');
+        $app['config']->set('oidc.auth_server.client_secret', 'test-client-secret');
+        $app['config']->set('oidc.auth_server.redirect_uri', 'http://localhost/auth/callback');
+        $app['config']->set('oidc.frontend_url', 'http://localhost:3000');
+        $app['config']->set('oidc.user_model', 'Admin9\\OidcClient\\Tests\\Fixtures\\User');
     }
 }

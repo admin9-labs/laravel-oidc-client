@@ -1,0 +1,45 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            if (! Schema::hasColumn('users', 'oidc_sub')) {
+                $table->string('oidc_sub')->nullable()->unique()->after('id');
+            }
+            if (! Schema::hasColumn('users', 'auth_server_refresh_token')) {
+                $table->text('auth_server_refresh_token')->nullable()->after('oidc_sub');
+            }
+        });
+
+        // Make password nullable for OIDC-only users
+        if (Schema::hasColumn('users', 'password')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->string('password')->nullable()->change();
+            });
+        }
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            if (Schema::hasColumn('users', 'oidc_sub')) {
+                $table->dropColumn('oidc_sub');
+            }
+            if (Schema::hasColumn('users', 'auth_server_refresh_token')) {
+                $table->dropColumn('auth_server_refresh_token');
+            }
+        });
+    }
+};
