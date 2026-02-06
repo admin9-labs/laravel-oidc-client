@@ -2,6 +2,10 @@
 
 namespace Admin9\OidcClient\Http\Controllers;
 
+use Admin9\OidcClient\Events\OidcAuthFailed;
+use Admin9\OidcClient\Events\OidcTokenExchanged;
+use Admin9\OidcClient\Events\OidcUserAuthenticated;
+use Admin9\OidcClient\Services\OidcService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -9,7 +13,6 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
@@ -65,6 +68,8 @@ class OidcController extends Controller
                 'description' => $request->error_description,
             ]);
 
+            OidcAuthFailed::dispatch($request->error, $request->error_description ?? 'Authorization denied');
+
             return $this->redirectToFrontendWithError(
                 $request->error,
                 $request->error_description ?? __('oidc-client::messages.authorization_denied')
@@ -83,51 +88,13 @@ class OidcController extends Controller
         }
 
         try {
-            $httpConfig = config('oidc-client.http');
-            $tokenUrl = config('oidc-client.auth_server.host').config('oidc-client.endpoints.token');
+            $oidcService = app(OidcService::class);
 
-            $response = Http::timeout($httpConfig['timeout'])
-                ->retry($httpConfig['retry_times'], $httpConfig['retry_delay'])
-                ->asForm()
-                ->post($tokenUrl, [
-                    'grant_type' => 'authorization_code',
-                    'client_id' => config('oidc-client.auth_server.client_id'),
-                    'client_secret' => config('oidc-client.auth_server.client_secret'),
-                    'redirect_uri' => config('oidc-client.auth_server.redirect_uri'),
-                    'code' => $request->code,
-                    'code_verifier' => $codeVerifier,
-                ]);
-
-            if ($response->failed()) {
-                Log::error('OIDC: Token exchange failed', [
-                    'status' => $response->status(),
-                    'error' => $response->json('error'),
-                    'error_description' => $response->json('error_description'),
-                ]);
-
-                return $this->redirectToFrontendWithError('token_exchange_failed', __('oidc-client::messages.token_exchange_failed'));
-            }
-
-            $tokens = $response->json();
+            $tokens = $oidcService->exchangeCodeForTokens($request->code, $codeVerifier);
             $accessToken = $tokens['access_token'];
             $refreshToken = $tokens['refresh_token'] ?? null;
 
-            $userinfoUrl = config('oidc-client.auth_server.host').config('oidc-client.endpoints.userinfo');
-
-            $userResponse = Http::timeout($httpConfig['timeout'] - 5)
-                ->retry($httpConfig['retry_times'], $httpConfig['retry_delay'])
-                ->withToken($accessToken)
-                ->get($userinfoUrl);
-
-            if ($userResponse->failed()) {
-                Log::error('OIDC: Failed to fetch user info', [
-                    'status' => $userResponse->status(),
-                ]);
-
-                return $this->redirectToFrontendWithError('userinfo_failed', __('oidc-client::messages.userinfo_failed'));
-            }
-
-            $userData = $userResponse->json();
+            $userData = $oidcService->fetchUserInfo($accessToken);
 
             $userModel = config('oidc-client.user_model');
             $mapping = config('oidc-client.user_mapping');
@@ -157,14 +124,15 @@ class OidcController extends Controller
 
             Log::info('OIDC: User authenticated', [
                 'user_id' => $user->id,
-                'email' => $user->email,
-                'oidc_sub' => $user->oidc_sub,
+                $identifierColumn => $user->{$identifierColumn},
                 'is_new' => $user->wasRecentlyCreated,
                 'has_refresh_token' => (bool) $refreshToken,
             ]);
 
+            OidcUserAuthenticated::dispatch($user, $userData, $user->wasRecentlyCreated);
+
             // Login user and regenerate session
-            Auth::login($user);
+            Auth::guard(config('oidc-client.web_guard', 'web'))->login($user);
             $request->session()->regenerate();
 
             $exchangeCode = Str::uuid()->toString();
@@ -175,11 +143,19 @@ class OidcController extends Controller
 
             return redirect($frontendUrl.'/auth/callback?code='.$exchangeCode);
 
+        } catch (\RuntimeException $e) {
+            Log::error('OIDC: '.$e->getMessage());
+
+            OidcAuthFailed::dispatch('auth_failed', $e->getMessage());
+
+            return $this->redirectToFrontendWithError('auth_failed', $e->getMessage());
         } catch (ConnectionException $e) {
             Log::critical('OIDC: Auth Server unreachable', [
                 'error' => $e->getMessage(),
                 'host' => config('oidc-client.auth_server.host'),
             ]);
+
+            OidcAuthFailed::dispatch('server_unreachable', $e->getMessage());
 
             return $this->redirectToFrontendWithError('server_unreachable', __('oidc-client::messages.server_unreachable'));
         }
@@ -211,6 +187,8 @@ class OidcController extends Controller
         Log::info('OIDC: Token exchanged successfully', [
             'user_id' => $user->id,
         ]);
+
+        OidcTokenExchanged::dispatch($user);
 
         return response()->json([
             'success' => true,

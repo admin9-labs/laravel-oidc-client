@@ -165,4 +165,15 @@ return [
     */
 
     'jwt_guard' => env('OIDC_JWT_GUARD', 'api'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Web Guard
+    |--------------------------------------------------------------------------
+    |
+    | The authentication guard to use for web session login during callback.
+    |
+    */
+
+    'web_guard' => env('OIDC_WEB_GUARD', 'web'),
 ];

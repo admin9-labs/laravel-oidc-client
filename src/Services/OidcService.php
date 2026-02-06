@@ -82,4 +82,71 @@ class OidcService
 
         return $user && ! empty($user->{$identifierColumn});
     }
+
+    /**
+     * Exchange authorization code for tokens via the Auth Server token endpoint.
+     *
+     * @throws \RuntimeException If the response is missing access_token
+     */
+    public function exchangeCodeForTokens(string $code, string $codeVerifier): array
+    {
+        $httpConfig = config('oidc-client.http');
+        $tokenUrl = config('oidc-client.auth_server.host').config('oidc-client.endpoints.token');
+
+        $response = Http::timeout($httpConfig['timeout'])
+            ->retry($httpConfig['retry_times'], $httpConfig['retry_delay'])
+            ->asForm()
+            ->post($tokenUrl, [
+                'grant_type' => 'authorization_code',
+                'client_id' => config('oidc-client.auth_server.client_id'),
+                'client_secret' => config('oidc-client.auth_server.client_secret'),
+                'redirect_uri' => config('oidc-client.auth_server.redirect_uri'),
+                'code' => $code,
+                'code_verifier' => $codeVerifier,
+            ]);
+
+        if ($response->failed()) {
+            throw new \RuntimeException(
+                'Token exchange failed: '.($response->json('error_description') ?? $response->json('error') ?? 'Unknown error'),
+                $response->status()
+            );
+        }
+
+        $tokens = $response->json();
+
+        if (empty($tokens['access_token'])) {
+            throw new \RuntimeException('Token response missing access_token');
+        }
+
+        return $tokens;
+    }
+
+    /**
+     * Fetch user info from the Auth Server userinfo endpoint.
+     *
+     * @throws \RuntimeException If the response fails or is missing the identifier claim
+     */
+    public function fetchUserInfo(string $accessToken): array
+    {
+        $httpConfig = config('oidc-client.http');
+        $userinfoUrl = config('oidc-client.auth_server.host').config('oidc-client.endpoints.userinfo');
+
+        $response = Http::timeout($httpConfig['timeout'] - 5)
+            ->retry($httpConfig['retry_times'], $httpConfig['retry_delay'])
+            ->withToken($accessToken)
+            ->get($userinfoUrl);
+
+        if ($response->failed()) {
+            throw new \RuntimeException('Failed to fetch user info', $response->status());
+        }
+
+        $userData = $response->json();
+        $identifierClaim = config('oidc-client.user_mapping.identifier_claim', 'sub');
+
+        if (empty($userData[$identifierClaim])) {
+            throw new \RuntimeException("UserInfo response missing required claim: {$identifierClaim}");
+        }
+
+        return $userData;
+    }
 }

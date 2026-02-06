@@ -2,7 +2,6 @@
     "name": "admin9/laravel-oidc-client",
     "description": "Laravel OIDC Client package with PKCE support for SSO/SLO authentication",
     "keywords": [
-        "admin9",
         "laravel",
         "oidc",
         "oauth",
