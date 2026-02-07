@@ -162,8 +162,9 @@ class OidcController extends Controller
     }
 
     /**
-     * Exchange one-time code for JWT token.
-     * This endpoint is rate-limited.
+     * Exchange code for token.
+     *
+     * Exchange one-time OIDC code for JWT token. This endpoint is rate-limited.
      */
     public function exchange(Request $request): JsonResponse
     {
