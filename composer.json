@@ -45,8 +45,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Admin9\\OidcClient\\Tests\\": "tests/",
-            "Workbench\\App\\": "workbench/app/"
+            "Admin9\\OidcClient\\Tests\\": "tests/"
         }
     },
     "scripts": {
