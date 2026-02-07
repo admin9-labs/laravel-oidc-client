@@ -2,6 +2,26 @@
 
 All notable changes to `laravel-oidc-client` will be documented in this file.
 
+## v1.0.2 - 2026-02-08
+
+### Documentation
+
+- **Drastically simplified documentation structure**: Reduced from 8 files to 3 essential files
+  - Removed verbose and unnecessary documentation (guide.md, advanced.md, api-reference.md, security.md, user-mapping.md)
+  - Removed CONTRIBUTING.md and SECURITY.md (use GitHub issues instead)
+  - Kept only essential docs: README.md, configuration.md, troubleshooting.md
+
+- **Improved README.md**:
+  - Removed limiting "designed for SPAs" language
+  - Added complete frontend integration examples (login, callback, JWT usage)
+  - Focused on quick start and practical usage
+  - Streamlined to help developers get started quickly
+
+- **Updated Chinese translations**: All Chinese docs updated to match simplified structure
+- **Fixed cross-references**: Updated all documentation links to reference only existing files
+
+**Note**: This is a documentation-only release. No code changes or breaking changes.
+
 ## v1.0.1 - Complete Chinese Documentation - 2026-02-07
 
 ### 📚 Documentation Improvements
