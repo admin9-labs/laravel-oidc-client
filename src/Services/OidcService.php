@@ -6,7 +6,6 @@ use Admin9\OidcClient\Exceptions\OidcException;
 use Admin9\OidcClient\Exceptions\OidcServerException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 
 class OidcService
 {
@@ -42,25 +41,14 @@ class OidcService
                 ]);
 
             if ($response->successful()) {
-                Log::info('OIDC: Auth Server token revoked', ['user_id' => $user->id]);
                 $user->update([$refreshTokenColumn => null]);
 
                 return true;
             }
 
-            Log::warning('OIDC: Failed to revoke Auth Server token', [
-                'user_id' => $user->id,
-                'status' => $response->status(),
-            ]);
-
             return false;
 
         } catch (ConnectionException $e) {
-            Log::warning('OIDC: Could not reach Auth Server for token revocation', [
-                'user_id' => $user->id,
-                'error' => $e->getMessage(),
-            ]);
-
             return false;
         }
     }
