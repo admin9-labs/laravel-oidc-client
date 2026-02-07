@@ -7,6 +7,7 @@
         "oauth",
         "pkce",
         "sso",
+        "slo",
         "authentication"
     ],
     "homepage": "https://github.com/admin9-labs/laravel-oidc-client",
