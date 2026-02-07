@@ -21,7 +21,7 @@ A Laravel package for OIDC (OpenID Connect) authentication with PKCE support, de
 
 - PHP 8.2+
 - Laravel 11.x or 12.x
-- JWT authentication package (e.g., `php-open-source-saver/jwt-auth`)
+- JWT authentication package (e.g., [`php-open-source-saver/jwt-auth`](https://github.com/PHP-Open-Source-Saver/jwt-auth) or [`tymon/jwt-auth`](https://github.com/tymondesigns/jwt-auth)) configured with an `api` guard
 
 ## Installation
 
@@ -132,7 +132,7 @@ The package registers the following routes:
 |--------|-----|------|-------------|
 | GET | `/auth/redirect` | `oidc.redirect` | Initiates OIDC authorization |
 | GET | `/auth/callback` | `oidc.callback` | Handles Auth Server callback |
-| POST | `/api/auth/exchange` | `auth.exchange` | Exchanges code for JWT token |
+| POST | `/api/auth/exchange` | `oidc.exchange` | Exchanges code for JWT token |
 
 **Note**: Logout is NOT provided by the package. You should implement it in your AuthController using `OidcService`.
 
@@ -174,6 +174,32 @@ class AuthController extends Controller
 | `revokeAuthServerToken($user)` | Revokes Auth Server token and clears stored refresh token |
 | `getSsoLogoutUrl()` | Returns the SSO logout URL for frontend redirect |
 | `isOidcUser($user)` | Checks if user authenticated via OIDC |
+| `findOrCreateUser($userData, $refreshToken)` | Creates or updates a local user from OIDC userinfo |
+
+## Events
+
+The package dispatches events you can listen to in your application:
+
+| Event | Payload | When |
+|-------|---------|------|
+| `OidcUserAuthenticated` | `$user`, `$userInfo`, `$isNewUser` | After successful OIDC callback and user creation |
+| `OidcTokenExchanged` | `$user` | After exchange code is swapped for a JWT |
+| `OidcAuthFailed` | `$errorCode`, `$errorMessage` | On authorization denial or server error |
+
+```php
+// Example: Send welcome email to new OIDC users
+use Admin9\OidcClient\Events\OidcUserAuthenticated;
+
+class SendWelcomeEmail
+{
+    public function handle(OidcUserAuthenticated $event): void
+    {
+        if ($event->isNewUser) {
+            // Send welcome email to $event->user
+        }
+    }
+}
+```
 
 ## Authentication Flow
 

@@ -2,6 +2,8 @@
 
 namespace Admin9\OidcClient\Services;
 
+use Admin9\OidcClient\Exceptions\OidcException;
+use Admin9\OidcClient\Exceptions\OidcServerException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -15,7 +17,7 @@ class OidcService
      * @param  mixed  $user  User model with auth_server_refresh_token field
      * @return bool Whether revocation was successful
      */
-    public function revokeAuthServerToken($user): bool
+    public function revokeAuthServerToken(mixed $user): bool
     {
         $refreshTokenColumn = config('oidc-client.user_mapping.refresh_token_column', 'auth_server_refresh_token');
 
@@ -76,7 +78,7 @@ class OidcService
     /**
      * Check if user authenticated via OIDC.
      */
-    public function isOidcUser($user): bool
+    public function isOidcUser(mixed $user): bool
     {
         $identifierColumn = config('oidc-client.user_mapping.identifier_column', 'oidc_sub');
 
@@ -86,7 +88,7 @@ class OidcService
     /**
      * Exchange authorization code for tokens via the Auth Server token endpoint.
      *
-     * @throws \RuntimeException If the response is missing access_token
+     * @throws OidcServerException If the response is missing access_token
      */
     public function exchangeCodeForTokens(string $code, string $codeVerifier): array
     {
@@ -94,7 +96,7 @@ class OidcService
         $tokenUrl = config('oidc-client.auth_server.host').config('oidc-client.endpoints.token');
 
         $response = Http::timeout($httpConfig['timeout'])
-            ->retry($httpConfig['retry_times'], $httpConfig['retry_delay'])
+            ->retry($httpConfig['retry_times'], $httpConfig['retry_delay'], throw: false)
             ->asForm()
             ->post($tokenUrl, [
                 'grant_type' => 'authorization_code',
@@ -106,7 +108,7 @@ class OidcService
             ]);
 
         if ($response->failed()) {
-            throw new \RuntimeException(
+            throw new OidcServerException(
                 'Token exchange failed: '.($response->json('error_description') ?? $response->json('error') ?? 'Unknown error'),
                 $response->status()
             );
@@ -115,7 +117,7 @@ class OidcService
         $tokens = $response->json();
 
         if (empty($tokens['access_token'])) {
-            throw new \RuntimeException('Token response missing access_token');
+            throw new OidcException('Token response missing access_token');
         }
 
         return $tokens;
@@ -124,29 +126,63 @@ class OidcService
     /**
      * Fetch user info from the Auth Server userinfo endpoint.
      *
-     * @throws \RuntimeException If the response fails or is missing the identifier claim
+     * @throws OidcException If the response fails or is missing the identifier claim
      */
     public function fetchUserInfo(string $accessToken): array
     {
         $httpConfig = config('oidc-client.http');
         $userinfoUrl = config('oidc-client.auth_server.host').config('oidc-client.endpoints.userinfo');
 
-        $response = Http::timeout($httpConfig['timeout'] - 5)
-            ->retry($httpConfig['retry_times'], $httpConfig['retry_delay'])
+        $response = Http::timeout(max(5, $httpConfig['timeout'] - 5))
+            ->retry($httpConfig['retry_times'], $httpConfig['retry_delay'], throw: false)
             ->withToken($accessToken)
             ->get($userinfoUrl);
 
         if ($response->failed()) {
-            throw new \RuntimeException('Failed to fetch user info', $response->status());
+            throw new OidcServerException('Failed to fetch user info', $response->status());
         }
 
         $userData = $response->json();
         $identifierClaim = config('oidc-client.user_mapping.identifier_claim', 'sub');
 
         if (empty($userData[$identifierClaim])) {
-            throw new \RuntimeException("UserInfo response missing required claim: {$identifierClaim}");
+            throw new OidcException("UserInfo response missing required claim: {$identifierClaim}");
         }
 
         return $userData;
+    }
+
+    /**
+     * Find or create a local user from OIDC userinfo data.
+     *
+     * @param  array  $userData  Userinfo claims from the Auth Server
+     * @param  string|null  $refreshToken  Auth Server refresh token to store
+     * @return \Illuminate\Contracts\Auth\Authenticatable&\Illuminate\Database\Eloquent\Model
+     */
+    public function findOrCreateUser(array $userData, ?string $refreshToken = null)
+    {
+        $userModel = config('oidc-client.user_model');
+        $mapping = config('oidc-client.user_mapping');
+        $identifierColumn = $mapping['identifier_column'] ?? 'oidc_sub';
+        $identifierClaim = $mapping['identifier_claim'] ?? 'sub';
+        $refreshTokenColumn = $mapping['refresh_token_column'] ?? 'auth_server_refresh_token';
+
+        $attributes = [];
+        foreach ($mapping['attributes'] ?? [] as $column => $resolver) {
+            $attributes[$column] = is_callable($resolver)
+                ? $resolver($userData)
+                : ($userData[$resolver] ?? null);
+        }
+
+        $user = $userModel::updateOrCreate(
+            [$identifierColumn => $userData[$identifierClaim]],
+            $attributes
+        );
+
+        if ($refreshToken) {
+            $user->update([$refreshTokenColumn => $refreshToken]);
+        }
+
+        return $user;
     }
 }

@@ -120,6 +120,8 @@ return [
 
     'rate_limits' => [
         'exchange' => env('OIDC_RATE_LIMIT_EXCHANGE', '10,1'), // 10 requests per minute
+        'redirect' => env('OIDC_RATE_LIMIT_REDIRECT', '5,1'), // 5 requests per minute
+        'callback' => env('OIDC_RATE_LIMIT_CALLBACK', '10,1'), // 10 requests per minute
     ],
 
     /*

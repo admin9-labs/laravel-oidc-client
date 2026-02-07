@@ -6,15 +6,20 @@ All notable changes to `laravel-oidc-client` will be documented in this file.
 
 ### Changed
 - Removed `"admin9"` from composer.json keywords.
-- Refactored controller to use `OidcService::exchangeCodeForTokens()` and `OidcService::fetchUserInfo()`.
+- Refactored controller to use `OidcService` for user provisioning (`findOrCreateUser`).
 - Fixed hardcoded `$user->email` / `$user->oidc_sub` in log — now uses configured `identifier_column`.
 - `Auth::login()` now uses configurable `web_guard` (default: `web`).
+- Renamed route `auth.exchange` to `oidc.exchange` for consistent naming.
+- Removed nonce parameter from authorization request (was stored but never validated).
 
 ### Added
-- `OidcClientUserInterface` contract in `src/Contracts/`.
+- `OidcService::findOrCreateUser()` method for user provisioning from OIDC userinfo.
 - Event system: `OidcUserAuthenticated`, `OidcTokenExchanged`, `OidcAuthFailed`.
 - `web_guard` config option for customizable web session guard.
 - Response validation in `OidcService` (checks for `access_token` and `identifier_claim`).
+
+### Removed
+- `OidcClientUserInterface` contract (was unused).
 
 ## 1.1.0 - Unreleased
 

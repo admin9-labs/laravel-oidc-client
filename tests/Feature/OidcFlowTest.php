@@ -56,5 +56,5 @@ it('loads configuration correctly', function () {
 it('registers routes correctly', function () {
     expect(\Route::has('oidc.redirect'))->toBeTrue();
     expect(\Route::has('oidc.callback'))->toBeTrue();
-    expect(\Route::has('auth.exchange'))->toBeTrue();
+    expect(\Route::has('oidc.exchange'))->toBeTrue();
 });

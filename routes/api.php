@@ -17,5 +17,5 @@ Route::prefix($apiConfig['prefix'])
     ->group(function () use ($rateLimits) {
         Route::post('/exchange', [OidcController::class, 'exchange'])
             ->middleware('throttle:'.$rateLimits['exchange'])
-            ->name('auth.exchange');
+            ->name('oidc.exchange');
     });

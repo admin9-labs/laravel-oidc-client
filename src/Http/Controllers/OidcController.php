@@ -5,6 +5,7 @@ namespace Admin9\OidcClient\Http\Controllers;
 use Admin9\OidcClient\Events\OidcAuthFailed;
 use Admin9\OidcClient\Events\OidcTokenExchanged;
 use Admin9\OidcClient\Events\OidcUserAuthenticated;
+use Admin9\OidcClient\Exceptions\OidcException;
 use Admin9\OidcClient\Services\OidcService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
@@ -19,6 +20,12 @@ use Illuminate\Support\Str;
 
 class OidcController extends Controller
 {
+    private const ALLOWED_ERROR_CODES = [
+        'access_denied', 'invalid_request', 'unauthorized_client',
+        'unsupported_response_type', 'invalid_scope', 'server_error',
+        'temporarily_unavailable',
+    ];
+
     /**
      * Initiate OIDC authorization request with PKCE.
      */
@@ -63,15 +70,19 @@ class OidcController extends Controller
     {
         // Check if user denied authorization
         if ($request->has('error')) {
+            $errorCode = in_array($request->error, self::ALLOWED_ERROR_CODES, true)
+                ? $request->error
+                : 'unknown_error';
+
             Log::warning('OIDC: Authorization denied by user', [
-                'error' => $request->error,
+                'error' => $errorCode,
                 'description' => $request->error_description,
             ]);
 
-            OidcAuthFailed::dispatch($request->error, $request->error_description ?? 'Authorization denied');
+            OidcAuthFailed::dispatch($errorCode, $request->error_description ?? 'Authorization denied');
 
             return $this->redirectToFrontendWithError(
-                $request->error,
+                $errorCode,
                 $request->error_description ?? __('oidc-client::messages.authorization_denied')
             );
         }
@@ -81,8 +92,7 @@ class OidcController extends Controller
 
         if (! $state || $state !== $request->state) {
             Log::warning('OIDC: Invalid state parameter', [
-                'expected' => $state,
-                'received' => $request->state,
+                'state_match' => false,
             ]);
             abort(403, 'Invalid state');
         }
@@ -91,47 +101,20 @@ class OidcController extends Controller
             $oidcService = app(OidcService::class);
 
             $tokens = $oidcService->exchangeCodeForTokens($request->code, $codeVerifier);
-            $accessToken = $tokens['access_token'];
-            $refreshToken = $tokens['refresh_token'] ?? null;
+            $userData = $oidcService->fetchUserInfo($tokens['access_token']);
+            $user = $oidcService->findOrCreateUser($userData, $tokens['refresh_token'] ?? null);
 
-            $userData = $oidcService->fetchUserInfo($accessToken);
-
-            $userModel = config('oidc-client.user_model');
-            $mapping = config('oidc-client.user_mapping');
-            $identifierColumn = $mapping['identifier_column'] ?? 'oidc_sub';
-            $identifierClaim = $mapping['identifier_claim'] ?? 'sub';
-            $refreshTokenColumn = $mapping['refresh_token_column'] ?? 'auth_server_refresh_token';
-
-            $attributes = [];
-            foreach ($mapping['attributes'] ?? [] as $column => $resolver) {
-                $attributes[$column] = is_callable($resolver)
-                    ? $resolver($userData)
-                    : ($userData[$resolver] ?? null);
-            }
-
-            $user = $userModel::updateOrCreate(
-                [$identifierColumn => $userData[$identifierClaim]],
-                $attributes
-            );
-
-            // Store Auth Server refresh_token for silent refresh and secure logout
-            // Model's encrypted cast will automatically encrypt
-            if ($refreshToken) {
-                $user->update([
-                    $refreshTokenColumn => $refreshToken,
-                ]);
-            }
+            $identifierColumn = config('oidc-client.user_mapping.identifier_column', 'oidc_sub');
 
             Log::info('OIDC: User authenticated', [
                 'user_id' => $user->id,
                 $identifierColumn => $user->{$identifierColumn},
                 'is_new' => $user->wasRecentlyCreated,
-                'has_refresh_token' => (bool) $refreshToken,
+                'has_refresh_token' => isset($tokens['refresh_token']),
             ]);
 
             OidcUserAuthenticated::dispatch($user, $userData, $user->wasRecentlyCreated);
 
-            // Login user and regenerate session
             Auth::guard(config('oidc-client.web_guard', 'web'))->login($user);
             $request->session()->regenerate();
 
@@ -143,12 +126,12 @@ class OidcController extends Controller
 
             return redirect($frontendUrl.'/auth/callback?code='.$exchangeCode);
 
-        } catch (\RuntimeException $e) {
+        } catch (OidcException $e) {
             Log::error('OIDC: '.$e->getMessage());
 
             OidcAuthFailed::dispatch('auth_failed', $e->getMessage());
 
-            return $this->redirectToFrontendWithError('auth_failed', $e->getMessage());
+            return $this->redirectToFrontendWithError('auth_failed', __('oidc-client::messages.token_exchange_failed'));
         } catch (ConnectionException $e) {
             Log::critical('OIDC: Auth Server unreachable', [
                 'error' => $e->getMessage(),
