@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             if (! Schema::hasColumn('users', 'oidc_sub')) {
-                $table->string('oidc_sub')->nullable()->unique()->after('id');
+                $table->string('oidc_sub')->nullable()->unique()->after('remember_token');
             }
             if (! Schema::hasColumn('users', 'auth_server_refresh_token')) {
                 $table->text('auth_server_refresh_token')->nullable()->after('oidc_sub');
