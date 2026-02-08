@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-oidc-client` will be documented in this file.
 
+## v1.0.3 - 2026-02-08
+
+### Changed
+
+- **Migration field positioning**: Moved OIDC fields (`oidc_sub` and `auth_server_refresh_token`) to appear after `remember_token` instead of after `id` for better table structure organization
+
+**Note**: This is a migration-only change. If you've already published and run the migration, this won't affect existing tables.
+
 ## v1.0.2 - 2026-02-08
 
 ### Documentation
