@@ -40,13 +40,15 @@ describe('callback', function () {
     });
 
     it('handles server_error from auth server', function () {
+        $redirectUrl = config('oidc-client.redirect_url');
+
         $response = $this->get('/auth/callback?error=server_error&error_description=Internal+error');
 
-        $response->assertRedirect();
-        $response->assertRedirectContains('error=server_error');
+        $response->assertRedirect($redirectUrl);
+        $response->assertSessionHas('oidc_error', 'server_error');
     });
 
-    it('redirects to frontend with error on token exchange failure', function () {
+    it('redirects with error on token exchange failure', function () {
         Session::put('oidc_state', 'valid-state');
         Session::put('oidc_code_verifier', 'test-verifier');
 
@@ -56,9 +58,11 @@ describe('callback', function () {
             ], 400),
         ]);
 
+        $redirectUrl = config('oidc-client.redirect_url');
+
         $response = $this->get('/auth/callback?code=test-code&state=valid-state');
 
-        $response->assertRedirect();
-        $response->assertRedirectContains('error=auth_failed');
+        $response->assertRedirect($redirectUrl);
+        $response->assertSessionHas('oidc_error', 'auth_failed');
     });
 });

@@ -15,8 +15,7 @@ class OidcServiceProvider extends PackageServiceProvider
             ->hasConfigFile('oidc-client')
             ->hasTranslations()
             ->hasMigration('2024_01_01_000000_add_oidc_fields_to_users_table')
-            ->hasRoute('web')
-            ->hasRoute('api');
+            ->hasRoute('web');
     }
 
     public function packageRegistered(): void

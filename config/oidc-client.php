@@ -19,15 +19,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Frontend URL
+    | Redirect URL
     |--------------------------------------------------------------------------
     |
-    | The URL of your frontend application. Used for redirects after
-    | authentication and logout.
+    | Where to redirect after successful OIDC authentication.
+    | Uses redirect()->intended() so any previously intended URL takes priority.
     |
     */
 
-    'frontend_url' => env('OIDC_FRONTEND_URL', env('FRONTEND_URL', 'http://localhost:3000')),
+    'redirect_url' => env('OIDC_REDIRECT_URL', '/dashboard'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Post-Logout Redirect URL
+    |--------------------------------------------------------------------------
+    |
+    | Where the Auth Server should redirect after SSO logout.
+    |
+    */
+
+    'post_logout_redirect_url' => env('OIDC_POST_LOGOUT_REDIRECT_URL', '/'),
 
     /*
     |--------------------------------------------------------------------------
@@ -77,17 +88,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Exchange Code TTL
-    |--------------------------------------------------------------------------
-    |
-    | How long (in minutes) the one-time exchange code is valid.
-    |
-    */
-
-    'exchange_code_ttl' => env('OIDC_EXCHANGE_CODE_TTL', 5),
-
-    /*
-    |--------------------------------------------------------------------------
     | Routes Configuration
     |--------------------------------------------------------------------------
     |
@@ -101,12 +101,6 @@ return [
             'prefix' => 'auth',
             'middleware' => ['web'],
         ],
-
-        // API routes (exchange, logout)
-        'api' => [
-            'prefix' => 'api/auth',
-            'middleware' => ['api'],
-        ],
     ],
 
     /*
@@ -119,7 +113,6 @@ return [
     */
 
     'rate_limits' => [
-        'exchange' => env('OIDC_RATE_LIMIT_EXCHANGE', '10,1'), // 10 requests per minute
         'redirect' => env('OIDC_RATE_LIMIT_REDIRECT', '5,1'), // 5 requests per minute
         'callback' => env('OIDC_RATE_LIMIT_CALLBACK', '10,1'), // 10 requests per minute
     ],
@@ -156,17 +149,6 @@ return [
         'revoke' => '/oauth/revoke',
         'logout' => '/oauth/logout',
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | JWT Guard
-    |--------------------------------------------------------------------------
-    |
-    | The authentication guard to use for JWT operations.
-    |
-    */
-
-    'jwt_guard' => env('OIDC_JWT_GUARD', 'api'),
 
     /*
     |--------------------------------------------------------------------------

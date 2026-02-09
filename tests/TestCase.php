@@ -21,7 +21,8 @@ abstract class TestCase extends BaseTestCase
         $app['config']->set('oidc-client.auth_server.client_id', 'test-client-id');
         $app['config']->set('oidc-client.auth_server.client_secret', 'test-client-secret');
         $app['config']->set('oidc-client.auth_server.redirect_uri', 'http://localhost/auth/callback');
-        $app['config']->set('oidc-client.frontend_url', 'http://localhost:3000');
+        $app['config']->set('oidc-client.redirect_url', '/dashboard');
+        $app['config']->set('oidc-client.post_logout_redirect_url', '/');
         $app['config']->set('oidc-client.user_model', 'Admin9\\OidcClient\\Tests\\Fixtures\\User');
     }
 }

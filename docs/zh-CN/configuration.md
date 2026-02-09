@@ -15,11 +15,11 @@
 
 | 键 | 类型 | 环境变量 | 默认值 | 描述 |
 |-----|------|---------|---------|-------------|
-| `frontend_url` | string | `OIDC_FRONTEND_URL` / `FRONTEND_URL` | `http://localhost:3000` | 前端应用 URL，用于认证后重定向 |
+| `redirect_url` | string | `OIDC_REDIRECT_URL` | `/dashboard` | 认证成功后的重定向地址 |
+| `post_logout_redirect_url` | string | `OIDC_POST_LOGOUT_REDIRECT_URL` | `/` | Auth Server SSO 登出后的重定向地址 |
 | `scopes` | string | `OIDC_SCOPES` | `openid profile email` | 空格分隔的 OIDC 作用域 |
 | `user_model` | string | `OIDC_USER_MODEL` | `App\\Models\\User` | 用户的 Eloquent 模型类 |
-| `exchange_code_ttl` | int | `OIDC_EXCHANGE_CODE_TTL` | `5` | 一次性交换码的生命周期（分钟） |
-| `jwt_guard` | string | `OIDC_JWT_GUARD` | `api` | 用于 JWT 令牌操作的认证守卫 |
+| `web_guard` | string | `OIDC_WEB_GUARD` | `web` | 用于 Web 会话登录的认证守卫 |
 
 ## 用户映射
 
@@ -45,16 +45,13 @@
 |-----|------|---------|-------------|
 | `routes.web.prefix` | string | `auth` | Web 路由的 URL 前缀（redirect、callback） |
 | `routes.web.middleware` | array | `['web']` | Web 路由的中间件 |
-| `routes.api.prefix` | string | `api/auth` | API 路由的 URL 前缀（exchange） |
-| `routes.api.middleware` | array | `['api']` | API 路由的中间件 |
 
 ## 速率限制
 
 | 键 | 类型 | 环境变量 | 默认值 | 描述 |
 |-----|------|---------|---------|-------------|
-| `rate_limits.exchange` | string | `OIDC_RATE_LIMIT_EXCHANGE` | `10,1` | 交换端点的限流规则（请求数,分钟数） |
-| `rate_limits.redirect` | string | `OIDC_RATE_LIMIT_REDIRECT` | `5,1` | 重定向端点的限流规则 |
-| `rate_limits.callback` | string | `OIDC_RATE_LIMIT_CALLBACK` | `10,1` | 回调端点的限流规则 |
+| `rate_limits.redirect` | string | `OIDC_RATE_LIMIT_REDIRECT` | `5,1` | 重定向端点的限流规则（请求数,分钟数） |
+| `rate_limits.callback` | string | `OIDC_RATE_LIMIT_CALLBACK` | `10,1` | 回调端点的限流规则（请求数,分钟数） |
 
 ## HTTP 客户端
 
@@ -89,12 +86,6 @@ OIDC_CLIENT_SECRET=your-client-secret
 OIDC_REDIRECT_URI=http://localhost/auth/callback
 ```
 
-### 推荐变量
-
-```env
-OIDC_FRONTEND_URL=http://localhost:3000
-```
-
 ### 所有可用变量
 
 | 变量 | 必需 | 默认值 | 描述 |
@@ -103,13 +94,11 @@ OIDC_FRONTEND_URL=http://localhost:3000
 | `OIDC_CLIENT_ID` | **是** | `null` | OAuth2 客户端 ID |
 | `OIDC_CLIENT_SECRET` | **是** | `null` | OAuth2 客户端密钥 |
 | `OIDC_REDIRECT_URI` | **是** | `null` | 回调 URL（必须匹配注册的 URI） |
-| `OIDC_FRONTEND_URL` | 否 | `http://localhost:3000` | 前端应用 URL |
+| `OIDC_REDIRECT_URL` | 否 | `/dashboard` | 登录后重定向地址 |
+| `OIDC_POST_LOGOUT_REDIRECT_URL` | 否 | `/` | Auth Server SSO 登出后重定向地址 |
 | `OIDC_SCOPES` | 否 | `openid profile email` | 空格分隔的 OIDC 作用域 |
 | `OIDC_USER_MODEL` | 否 | `App\\Models\\User` | 用户模型类 |
-| `OIDC_EXCHANGE_CODE_TTL` | 否 | `5` | 交换码生命周期（分钟） |
-| `OIDC_JWT_GUARD` | 否 | `api` | JWT 认证守卫名称 |
 | `OIDC_WEB_GUARD` | 否 | `web` | Web 会话守卫名称 |
-| `OIDC_RATE_LIMIT_EXCHANGE` | 否 | `10,1` | 交换端点速率限制 |
 | `OIDC_RATE_LIMIT_REDIRECT` | 否 | `5,1` | 重定向端点速率限制 |
 | `OIDC_RATE_LIMIT_CALLBACK` | 否 | `10,1` | 回调端点速率限制 |
 | `OIDC_HTTP_TIMEOUT` | 否 | `15` | HTTP 超时（秒） |
@@ -125,8 +114,6 @@ OIDC_AUTH_SERVER_HOST=https://auth.dev.example.com
 OIDC_CLIENT_ID=dev-client-id
 OIDC_CLIENT_SECRET=dev-client-secret
 OIDC_REDIRECT_URI=http://localhost:8000/auth/callback
-OIDC_FRONTEND_URL=http://localhost:3000
-OIDC_RATE_LIMIT_EXCHANGE=100,1
 ```
 
 **生产环境：**
@@ -135,8 +122,9 @@ OIDC_RATE_LIMIT_EXCHANGE=100,1
 OIDC_AUTH_SERVER_HOST=https://auth.example.com
 OIDC_CLIENT_ID=prod-client-id
 OIDC_CLIENT_SECRET=prod-client-secret
-OIDC_REDIRECT_URI=https://api.example.com/auth/callback
-OIDC_FRONTEND_URL=https://app.example.com
+OIDC_REDIRECT_URI=https://app.example.com/auth/callback
+OIDC_REDIRECT_URL=/dashboard
+OIDC_POST_LOGOUT_REDIRECT_URL=https://app.example.com
 OIDC_HTTP_TIMEOUT=20
 OIDC_HTTP_RETRY_TIMES=3
 ```
@@ -147,8 +135,7 @@ OIDC_HTTP_RETRY_TIMES=3
 OIDC_AUTH_SERVER_HOST=https://auth.example.com
 OIDC_CLIENT_ID=my-app-client-id
 OIDC_CLIENT_SECRET=my-app-client-secret
-OIDC_REDIRECT_URI=https://api.example.com/auth/callback
-OIDC_FRONTEND_URL=https://app.example.com
+OIDC_REDIRECT_URI=https://app.example.com/auth/callback
 ```
 
 ## 另请参阅

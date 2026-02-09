@@ -1,7 +1,5 @@
 <?php
 
-use Illuminate\Support\Str;
-
 it('generates valid PKCE and state on redirect', function () {
     $response = $this->get('/auth/redirect');
 
@@ -23,26 +21,9 @@ it('validates state parameter on callback', function () {
 it('handles authorization denial on callback', function () {
     $response = $this->get('/auth/callback?error=access_denied&error_description=User+denied+access');
 
-    $frontendUrl = config('oidc-client.frontend_url');
-    $response->assertRedirect();
-    $response->assertRedirectContains($frontendUrl.'/auth/callback');
-    $response->assertRedirectContains('error=access_denied');
-});
-
-it('validates code format on exchange', function () {
-    $this->postJson('/api/auth/exchange', [
-        'code' => 'not-a-valid-uuid',
-    ])->assertUnprocessable();
-});
-
-it('rejects invalid exchange code', function () {
-    $this->postJson('/api/auth/exchange', [
-        'code' => Str::uuid()->toString(),
-    ])->assertStatus(401)
-        ->assertJson([
-            'success' => false,
-            'message' => 'Invalid or expired exchange code',
-        ]);
+    $redirectUrl = config('oidc-client.redirect_url');
+    $response->assertRedirect($redirectUrl);
+    $response->assertSessionHas('oidc_error', 'access_denied');
 });
 
 it('loads configuration correctly', function () {
@@ -50,11 +31,10 @@ it('loads configuration correctly', function () {
     expect(config('oidc-client.auth_server.client_id'))->toBe('test-client-id');
     expect(config('oidc-client.auth_server.client_secret'))->toBe('test-client-secret');
     expect(config('oidc-client.auth_server.redirect_uri'))->toBe('http://localhost/auth/callback');
-    expect(config('oidc-client.frontend_url'))->toBe('http://localhost:3000');
+    expect(config('oidc-client.redirect_url'))->toBe('/dashboard');
 });
 
 it('registers routes correctly', function () {
     expect(\Route::has('oidc.redirect'))->toBeTrue();
     expect(\Route::has('oidc.callback'))->toBeTrue();
-    expect(\Route::has('oidc.exchange'))->toBeTrue();
 });

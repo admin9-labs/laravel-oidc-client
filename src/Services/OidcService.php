@@ -54,12 +54,12 @@ class OidcService
     }
 
     /**
-     * Get the SSO logout URL for frontend redirect.
+     * Get the SSO logout URL for redirect.
      */
     public function getSsoLogoutUrl(): string
     {
         return config('oidc-client.auth_server.host').config('oidc-client.endpoints.logout').'?'.http_build_query([
-            'post_logout_redirect_uri' => config('oidc-client.frontend_url'),
+            'post_logout_redirect_uri' => config('oidc-client.post_logout_redirect_url', '/'),
         ]);
     }
 

@@ -6,23 +6,21 @@
 
 English | [简体中文](docs/zh-CN/README.md)
 
-A Laravel package for OIDC (OpenID Connect) authentication with PKCE support.
+A Laravel package for OIDC (OpenID Connect) authentication with PKCE support. Architecture-agnostic — works with Blade, Livewire, Inertia, or any Laravel stack.
 
 ## Features
 
-- ✅ OIDC Authorization Code Flow with PKCE
-- ✅ Automatic user provisioning from OIDC claims
-- ✅ Flexible user mapping configuration
-- ✅ Token revocation support
-- ✅ Rate limiting on all endpoints
-- ✅ Event system for authentication lifecycle
+- OIDC Authorization Code Flow with PKCE
+- Automatic user provisioning from OIDC claims
+- Flexible user mapping configuration
+- Token revocation and SSO logout support
+- Rate limiting on all endpoints
+- Event system for authentication lifecycle
 
 ## Requirements
 
 - PHP 8.2+
 - Laravel 11.x or 12.x
-- JWT package: [`php-open-source-saver/jwt-auth`](https://github.com/PHP-Open-Source-Saver/jwt-auth) or [`tymon/jwt-auth`](https://github.com/tymondesigns/jwt-auth)
-- Persistent cache driver (redis, database, file)
 - Persistent session driver (redis, database, file)
 
 ## Installation
@@ -43,7 +41,6 @@ OIDC_AUTH_SERVER_HOST=https://auth.example.com
 OIDC_CLIENT_ID=your-client-id
 OIDC_CLIENT_SECRET=your-client-secret
 OIDC_REDIRECT_URI=http://localhost:8000/auth/callback
-OIDC_FRONTEND_URL=http://localhost:3000
 ```
 
 Update `app/Models/User.php`:
@@ -75,59 +72,70 @@ protected function casts(): array
 
 ## Usage
 
-### Backend Routes
+### Routes
 
 The package registers these routes:
 
 | Method | URI | Description |
 |--------|-----|-------------|
 | GET | `/auth/redirect` | Start OIDC flow |
-| GET | `/auth/callback` | Handle callback |
-| POST | `/api/auth/exchange` | Exchange code for JWT |
+| GET | `/auth/callback` | Handle callback, create session, redirect |
 
-### Frontend Integration
+### How It Works
 
-#### 1. Login
+1. User visits `/auth/redirect` — redirected to your OIDC provider
+2. After authentication, the provider redirects back to `/auth/callback`
+3. The package exchanges the authorization code for tokens, fetches user info, and creates/updates the local user
+4. The user is logged in via Laravel's web session guard and redirected to the configured `redirect_url` (default: `/dashboard`)
 
-Redirect to start OIDC flow:
+### Login Link
 
-```javascript
-window.location.href = 'http://localhost:8000/auth/redirect';
+```html
+<a href="/auth/redirect">Login with SSO</a>
 ```
 
-#### 2. Callback
+### Handling Errors
 
-Handle callback in your frontend:
+Authentication errors are flashed to the session:
 
-```javascript
-const params = new URLSearchParams(window.location.search);
-const code = params.get('code');
+```php
+@if (session('oidc_error'))
+    <div class="alert alert-danger">
+        Authentication failed: {{ session('oidc_error_description') }}
+    </div>
+@endif
+```
 
-if (code) {
-  const response = await fetch('http://localhost:8000/api/auth/exchange', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code }),
-  });
+### Logout
 
-  const data = await response.json();
-  if (data.success) {
-    localStorage.setItem('token', data.data.access_token);
-    window.location.href = '/dashboard';
-  }
+Create a logout controller using `OidcService`:
+
+```php
+use Admin9\OidcClient\Services\OidcService;
+
+public function logout(Request $request, OidcService $oidcService)
+{
+    $user = $request->user();
+    $oidcService->revokeAuthServerToken($user);
+
+    Auth::guard('web')->logout();
+    $request->session()->invalidate();
+    $request->session()->regenerateToken();
+
+    if ($oidcService->isOidcUser($user)) {
+        return redirect($oidcService->getSsoLogoutUrl());
+    }
+
+    return redirect('/');
 }
 ```
 
-#### 3. Using JWT
+### Optional Configuration
 
-Use the token for authenticated requests:
-
-```javascript
-fetch('http://localhost:8000/api/user', {
-  headers: {
-    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-  },
-});
+```env
+OIDC_REDIRECT_URL=/dashboard              # Where to redirect after login (default: /dashboard)
+OIDC_POST_LOGOUT_REDIRECT_URL=/           # Where Auth Server redirects after SSO logout (default: /)
+OIDC_WEB_GUARD=web                        # Auth guard for session login (default: web)
 ```
 
 ## Documentation

@@ -15,11 +15,11 @@ The configuration file is published to `config/oidc-client.php`. The config key 
 
 | Key | Type | Env Var | Default | Description |
 |-----|------|---------|---------|-------------|
-| `frontend_url` | string | `OIDC_FRONTEND_URL` / `FRONTEND_URL` | `http://localhost:3000` | Frontend app URL for post-auth redirects |
+| `redirect_url` | string | `OIDC_REDIRECT_URL` | `/dashboard` | Where to redirect after successful authentication |
+| `post_logout_redirect_url` | string | `OIDC_POST_LOGOUT_REDIRECT_URL` | `/` | Where Auth Server redirects after SSO logout |
 | `scopes` | string | `OIDC_SCOPES` | `openid profile email` | Space-separated OIDC scopes |
 | `user_model` | string | `OIDC_USER_MODEL` | `App\Models\User` | Eloquent model class for users |
-| `exchange_code_ttl` | int | `OIDC_EXCHANGE_CODE_TTL` | `5` | One-time exchange code lifetime in minutes |
-| `jwt_guard` | string | `OIDC_JWT_GUARD` | `api` | Auth guard used for JWT token operations |
+| `web_guard` | string | `OIDC_WEB_GUARD` | `web` | Auth guard used for web session login |
 
 ## User Mapping
 
@@ -45,14 +45,13 @@ Each entry in `attributes` maps a DB column name to either a userinfo key (strin
 |-----|------|---------|-------------|
 | `routes.web.prefix` | string | `auth` | URL prefix for web routes (redirect, callback) |
 | `routes.web.middleware` | array | `['web']` | Middleware for web routes |
-| `routes.api.prefix` | string | `api/auth` | URL prefix for API routes (exchange) |
-| `routes.api.middleware` | array | `['api']` | Middleware for API routes |
 
 ## Rate Limiting
 
 | Key | Type | Env Var | Default | Description |
 |-----|------|---------|---------|-------------|
-| `rate_limits.exchange` | string | `OIDC_RATE_LIMIT_EXCHANGE` | `10,1` | Throttle rule for the exchange endpoint (requests,minutes) |
+| `rate_limits.redirect` | string | `OIDC_RATE_LIMIT_REDIRECT` | `5,1` | Throttle rule for the redirect endpoint (requests,minutes) |
+| `rate_limits.callback` | string | `OIDC_RATE_LIMIT_CALLBACK` | `10,1` | Throttle rule for the callback endpoint (requests,minutes) |
 
 ## HTTP Client
 
@@ -87,12 +86,6 @@ OIDC_CLIENT_SECRET=your-client-secret
 OIDC_REDIRECT_URI=http://localhost/auth/callback
 ```
 
-### Recommended Variables
-
-```env
-OIDC_FRONTEND_URL=http://localhost:3000
-```
-
 ### All Available Variables
 
 | Variable | Required | Default | Description |
@@ -101,13 +94,11 @@ OIDC_FRONTEND_URL=http://localhost:3000
 | `OIDC_CLIENT_ID` | **Yes** | `null` | OAuth2 client ID |
 | `OIDC_CLIENT_SECRET` | **Yes** | `null` | OAuth2 client secret |
 | `OIDC_REDIRECT_URI` | **Yes** | `null` | Callback URL (must match registered URI) |
-| `OIDC_FRONTEND_URL` | No | `http://localhost:3000` | Frontend application URL |
+| `OIDC_REDIRECT_URL` | No | `/dashboard` | Where to redirect after login |
+| `OIDC_POST_LOGOUT_REDIRECT_URL` | No | `/` | Where Auth Server redirects after SSO logout |
 | `OIDC_SCOPES` | No | `openid profile email` | Space-separated OIDC scopes |
 | `OIDC_USER_MODEL` | No | `App\Models\User` | User model class |
-| `OIDC_EXCHANGE_CODE_TTL` | No | `5` | Exchange code lifetime (minutes) |
-| `OIDC_JWT_GUARD` | No | `api` | JWT auth guard name |
 | `OIDC_WEB_GUARD` | No | `web` | Web session guard name |
-| `OIDC_RATE_LIMIT_EXCHANGE` | No | `10,1` | Exchange endpoint rate limit |
 | `OIDC_RATE_LIMIT_REDIRECT` | No | `5,1` | Redirect endpoint rate limit |
 | `OIDC_RATE_LIMIT_CALLBACK` | No | `10,1` | Callback endpoint rate limit |
 | `OIDC_HTTP_TIMEOUT` | No | `15` | HTTP timeout (seconds) |
@@ -123,8 +114,6 @@ OIDC_AUTH_SERVER_HOST=https://auth.dev.example.com
 OIDC_CLIENT_ID=dev-client-id
 OIDC_CLIENT_SECRET=dev-client-secret
 OIDC_REDIRECT_URI=http://localhost:8000/auth/callback
-OIDC_FRONTEND_URL=http://localhost:3000
-OIDC_RATE_LIMIT_EXCHANGE=100,1
 ```
 
 **Production:**
@@ -133,8 +122,9 @@ OIDC_RATE_LIMIT_EXCHANGE=100,1
 OIDC_AUTH_SERVER_HOST=https://auth.example.com
 OIDC_CLIENT_ID=prod-client-id
 OIDC_CLIENT_SECRET=prod-client-secret
-OIDC_REDIRECT_URI=https://api.example.com/auth/callback
-OIDC_FRONTEND_URL=https://app.example.com
+OIDC_REDIRECT_URI=https://app.example.com/auth/callback
+OIDC_REDIRECT_URL=/dashboard
+OIDC_POST_LOGOUT_REDIRECT_URL=https://app.example.com
 OIDC_HTTP_TIMEOUT=20
 OIDC_HTTP_RETRY_TIMES=3
 ```
@@ -145,8 +135,7 @@ OIDC_HTTP_RETRY_TIMES=3
 OIDC_AUTH_SERVER_HOST=https://auth.example.com
 OIDC_CLIENT_ID=my-app-client-id
 OIDC_CLIENT_SECRET=my-app-client-secret
-OIDC_REDIRECT_URI=https://api.example.com/auth/callback
-OIDC_FRONTEND_URL=https://app.example.com
+OIDC_REDIRECT_URI=https://app.example.com/auth/callback
 ```
 
 ## See Also

@@ -1,7 +1,6 @@
 <?php
 
 use Admin9\OidcClient\Events\OidcAuthFailed;
-use Admin9\OidcClient\Events\OidcTokenExchanged;
 use Admin9\OidcClient\Events\OidcUserAuthenticated;
 use Admin9\OidcClient\Tests\Fixtures\User;
 
@@ -24,15 +23,5 @@ describe('OidcUserAuthenticated', function () {
         expect($event->user)->toBe($user);
         expect($event->userInfo)->toBe($userInfo);
         expect($event->isNewUser)->toBeTrue();
-    });
-});
-
-describe('OidcTokenExchanged', function () {
-    it('stores user', function () {
-        $user = new User;
-
-        $event = new OidcTokenExchanged($user);
-
-        expect($event->user)->toBe($user);
     });
 });

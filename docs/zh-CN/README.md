@@ -6,23 +6,21 @@
 
 [English](../../README.md) | 简体中文
 
-一个支持 PKCE 的 Laravel OIDC（OpenID Connect）认证包。
+一个支持 PKCE 的 Laravel OIDC（OpenID Connect）认证包。架构无关 - 适用于 Blade、Livewire、Inertia 或任何 Laravel 技术栈。
 
 ## 功能特性
 
-- ✅ OIDC 授权码流程 + PKCE
-- ✅ 从 OIDC 声明自动创建/更新用户
-- ✅ 灵活的用户映射配置
-- ✅ 令牌撤销支持
-- ✅ 所有端点速率限制
-- ✅ 认证生命周期事件系统
+- OIDC 授权码流程 + PKCE
+- 从 OIDC 声明自动创建/更新用户
+- 灵活的用户映射配置
+- 令牌撤销和 SSO 登出支持
+- 所有端点速率限制
+- 认证生命周期事件系统
 
 ## 系统要求
 
 - PHP 8.2+
 - Laravel 11.x 或 12.x
-- JWT 包：[`php-open-source-saver/jwt-auth`](https://github.com/PHP-Open-Source-Saver/jwt-auth) 或 [`tymon/jwt-auth`](https://github.com/tymondesigns/jwt-auth)
-- 持久化缓存驱动（redis、database、file）
 - 持久化会话驱动（redis、database、file）
 
 ## 安装
@@ -43,7 +41,6 @@ OIDC_AUTH_SERVER_HOST=https://auth.example.com
 OIDC_CLIENT_ID=your-client-id
 OIDC_CLIENT_SECRET=your-client-secret
 OIDC_REDIRECT_URI=http://localhost:8000/auth/callback
-OIDC_FRONTEND_URL=http://localhost:3000
 ```
 
 更新 `app/Models/User.php`：
@@ -75,59 +72,70 @@ protected function casts(): array
 
 ## 使用
 
-### 后端路由
+### 路由
 
 包注册了以下路由：
 
 | 方法 | URI | 描述 |
 |--------|-----|-------------|
 | GET | `/auth/redirect` | 启动 OIDC 流程 |
-| GET | `/auth/callback` | 处理回调 |
-| POST | `/api/auth/exchange` | 交换码换取 JWT |
+| GET | `/auth/callback` | 处理回调、创建会话、重定向 |
 
-### 前端集成
+### 工作原理
 
-#### 1. 登录
+1. 用户访问 `/auth/redirect` — 重定向到 OIDC 提供商
+2. 认证后，提供商重定向回 `/auth/callback`
+3. 包交换授权码获取令牌，获取用户信息，创建/更新本地用户
+4. 用户通过 Laravel Web 会话守卫登录，重定向到配置的 `redirect_url`（默认：`/dashboard`）
 
-重定向开始 OIDC 流程：
+### 登录链接
 
-```javascript
-window.location.href = 'http://localhost:8000/auth/redirect';
+```html
+<a href="/auth/redirect">SSO 登录</a>
 ```
 
-#### 2. 回调
+### 错误处理
 
-在前端处理回调：
+认证错误会闪存到会话中：
 
-```javascript
-const params = new URLSearchParams(window.location.search);
-const code = params.get('code');
+```php
+@if (session('oidc_error'))
+    <div class="alert alert-danger">
+        认证失败：{{ session('oidc_error_description') }}
+    </div>
+@endif
+```
 
-if (code) {
-  const response = await fetch('http://localhost:8000/api/auth/exchange', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code }),
-  });
+### 登出
 
-  const data = await response.json();
-  if (data.success) {
-    localStorage.setItem('token', data.data.access_token);
-    window.location.href = '/dashboard';
-  }
+使用 `OidcService` 创建登出控制器：
+
+```php
+use Admin9\OidcClient\Services\OidcService;
+
+public function logout(Request $request, OidcService $oidcService)
+{
+    $user = $request->user();
+    $oidcService->revokeAuthServerToken($user);
+
+    Auth::guard('web')->logout();
+    $request->session()->invalidate();
+    $request->session()->regenerateToken();
+
+    if ($oidcService->isOidcUser($user)) {
+        return redirect($oidcService->getSsoLogoutUrl());
+    }
+
+    return redirect('/');
 }
 ```
 
-#### 3. 使用 JWT
+### 可选配置
 
-使用令牌进行认证请求：
-
-```javascript
-fetch('http://localhost:8000/api/user', {
-  headers: {
-    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-  },
-});
+```env
+OIDC_REDIRECT_URL=/dashboard              # 登录后重定向地址（默认：/dashboard）
+OIDC_POST_LOGOUT_REDIRECT_URL=/           # Auth Server SSO 登出后重定向地址（默认：/）
+OIDC_WEB_GUARD=web                        # 会话登录的认证守卫（默认：web）
 ```
 
 ## 文档

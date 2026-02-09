@@ -20,7 +20,7 @@ Common errors encountered when using the OIDC client package, with causes and so
 
 ## 2. Token Exchange Failed
 
-**Error:** The callback redirects to the frontend with `error=token_exchange_failed`.
+**Error:** After callback, the user is redirected with `oidc_error=auth_failed` flashed to the session.
 
 **Causes:**
 - The `client_id` or `client_secret` is incorrect.
@@ -36,7 +36,7 @@ Common errors encountered when using the OIDC client package, with causes and so
 
 ## 3. Userinfo Fetch Failed
 
-**Error:** The callback redirects to the frontend with `error=userinfo_failed`.
+**Error:** After callback, the user is redirected with `oidc_error=auth_failed` flashed to the session.
 
 **Causes:**
 - The access token returned by the Auth Server is invalid or expired.
@@ -50,7 +50,7 @@ Common errors encountered when using the OIDC client package, with causes and so
 
 ## 4. Auth Server Unreachable
 
-**Error:** The callback redirects to the frontend with `error=server_unreachable`.
+**Error:** After callback, the user is redirected with `oidc_error=server_unreachable` flashed to the session.
 
 **Causes:**
 - The Auth Server host is down or unreachable from the Laravel application server.
@@ -65,75 +65,7 @@ Common errors encountered when using the OIDC client package, with causes and so
 - Increase `OIDC_HTTP_TIMEOUT` if the Auth Server is slow to respond.
 - Increase `OIDC_HTTP_RETRY_TIMES` for transient network issues.
 
-## 5. Exchange Code Expired or Invalid
-
-**Error:** `POST /api/auth/exchange` returns `401` with `"Invalid or expired exchange code"`.
-
-**Causes:**
-- The exchange code has expired (default TTL is 5 minutes).
-- The exchange code was already used (codes are one-time use, pulled from cache on first use).
-- The cache driver is not persistent (e.g., `array` driver in production).
-- The frontend sent a malformed or incorrect code.
-
-**Solutions:**
-- Ensure the frontend calls the exchange endpoint promptly after receiving the code.
-- Increase `OIDC_EXCHANGE_CODE_TTL` if 5 minutes is too short for your use case.
-- Use a persistent cache driver (`redis`, `database`, `file`) -- not `array`.
-- Verify the frontend is sending the code exactly as received (UUID format).
-- Check that the frontend is not calling the exchange endpoint twice.
-
-## 6. Rate Limit Exceeded on Exchange
-
-**Error:** `429 Too Many Requests` on `POST /api/auth/exchange`.
-
-**Causes:**
-- The frontend is retrying the exchange request too aggressively.
-- Multiple users share the same IP and hit the rate limit collectively.
-
-**Solutions:**
-- Increase the rate limit via `OIDC_RATE_LIMIT_EXCHANGE` (e.g., `30,1` for 30 requests per minute).
-- Ensure the frontend does not retry on success or after receiving a 401.
-
-### Understanding Rate Limiting
-
-The package applies rate limiting to all OIDC endpoints to prevent abuse:
-
-| Endpoint | Default Limit | Environment Variable |
-|----------|---------------|---------------------|
-| `/auth/redirect` | 5 requests/minute | `OIDC_RATE_LIMIT_REDIRECT` |
-| `/auth/callback` | 10 requests/minute | `OIDC_RATE_LIMIT_CALLBACK` |
-| `/api/auth/exchange` | 10 requests/minute | `OIDC_RATE_LIMIT_EXCHANGE` |
-
-**What happens when rate limit is exceeded:**
-- The endpoint returns HTTP `429 Too Many Requests`
-- The response includes a `Retry-After` header indicating when to retry
-- Laravel logs the rate limit hit (check `storage/logs/laravel.log`)
-
-**How to customize rate limits:**
-
-Add to your `.env`:
-```env
-# Format: requests,minutes
-OIDC_RATE_LIMIT_EXCHANGE=20,1    # 20 requests per minute
-OIDC_RATE_LIMIT_REDIRECT=10,1    # 10 requests per minute
-OIDC_RATE_LIMIT_CALLBACK=20,1    # 20 requests per minute
-```
-
-**How to monitor rate limit hits:**
-
-Listen to Laravel's rate limiting events or check logs:
-```php
-// In a service provider
-RateLimiter::hit('oidc.exchange');  // Logged automatically by Laravel
-```
-
-**Best practices:**
-- Set limits based on your expected traffic patterns
-- Monitor logs for legitimate users hitting limits
-- Implement exponential backoff in frontend retry logic
-- Consider per-user rate limiting instead of per-IP for authenticated endpoints
-
-## 7. User Model Errors
+## 5. User Model Errors
 
 **Error:** `MassAssignmentException` or missing column errors during callback.
 
@@ -147,89 +79,23 @@ RateLimiter::hit('oidc.exchange');  // Logged automatically by Laravel
 - Run `php artisan migrate` to ensure the migration has been applied.
 - Verify `user_mapping.attributes` keys match actual database column names.
 
-## 8. Cache Driver Requirements
+## 6. Session Driver Requirements
 
-**Error:** Exchange codes expire immediately or state validation fails randomly.
+**Error:** State validation fails randomly or login sessions are lost.
 
 **Causes:**
-- Using a non-persistent cache driver (e.g., `array`) in production.
-- Cache is being cleared between OIDC flow steps.
-- Multiple application servers not sharing the same cache store.
+- Using a non-persistent session driver (e.g., `array`) in production.
+- Session is being cleared between OIDC flow steps.
+- Multiple application servers not sharing the same session store.
 
-**Why persistent cache is required:**
-
-The OIDC flow stores critical data in Laravel's cache:
-1. **PKCE code_verifier** - Stored during redirect, retrieved during callback (lifespan: ~1-5 minutes)
-2. **State parameter** - Stored during redirect, validated during callback (lifespan: ~1-5 minutes)
-3. **Exchange codes** - Stored during callback, consumed during exchange (lifespan: 5 minutes by default)
-
-If the cache is not persistent, this data is lost and the flow fails.
-
-**What breaks with array driver:**
-- ✗ `array` driver stores data in memory only (lost between requests)
-- ✗ State validation fails with "Invalid state" error
-- ✗ Exchange codes are immediately "expired or invalid"
-- ✗ PKCE verification fails during token exchange
-
-**Recommended cache drivers:**
-
-| Driver | Use Case | Configuration |
-|--------|----------|---------------|
-| `redis` | **Production (recommended)** | Fast, persistent, supports multiple servers |
-| `database` | Production | Persistent, no additional dependencies |
-| `file` | Development/Single-server | Persistent, simple setup |
-| `memcached` | Production | Fast, persistent, supports multiple servers |
-| `array` | **Testing only** | Non-persistent, DO NOT use in production |
-
-**How to configure cache driver:**
-
-In `.env`:
-```env
-CACHE_DRIVER=redis  # or database, file, memcached
-```
-
-For Redis:
-```env
-CACHE_DRIVER=redis
-REDIS_HOST=127.0.0.1
-REDIS_PASSWORD=null
-REDIS_PORT=6379
-```
-
-For Database:
-```bash
-php artisan cache:table
-php artisan migrate
-```
-
-```env
-CACHE_DRIVER=database
-```
-
-**Verifying cache persistence:**
-
-Test that cache persists between requests:
-```bash
-php artisan tinker
->>> cache()->put('test', 'value', 60);
->>> exit
-
-php artisan tinker
->>> cache()->get('test');  // Should return "value"
-```
-
-If `cache()->get('test')` returns `null`, your cache driver is not persistent.
-
-**Multi-server deployments:**
-
-If running multiple application servers (load balanced):
-- Use `redis` or `database` cache driver (NOT `file`)
-- All servers must connect to the same Redis/database instance
-- Verify cache is shared: set a value on server A, read it from server B
+**Solutions:**
+- Use a persistent session driver (`redis`, `database`, `file`) — not `array`.
+- For multi-server deployments, use `redis` or `database` and ensure all servers share the same store.
 
 ## Debugging Tips
 
 - Listen to the `OidcAuthFailed` event to capture error codes and messages for logging or monitoring.
+- Check `session('oidc_error')` and `session('oidc_error_description')` on your redirect target page to display errors.
 - Use `php artisan route:list` to verify the OIDC routes are registered correctly.
 - Test the Auth Server connection: `curl -s https://auth.example.com/oauth/authorize | head`.
 
@@ -243,10 +109,6 @@ OIDC (OpenID Connect) is an authentication protocol built on top of OAuth 2.0. I
 
 Yes. This package is a **client** that connects to an external OIDC provider (Auth Server). You need Keycloak, Auth0, Okta, or a custom OAuth2/OIDC server.
 
-### Can I use the `array` cache driver?
-
-**No.** The `array` driver is non-persistent and loses data between requests. Use `redis`, `database`, or `file` instead.
-
 ### Why does my session keep expiring?
 
 Check your session driver. The `array` driver is non-persistent. Use `database`, `redis`, or `file`.
@@ -256,18 +118,20 @@ Check your session driver. The `array` driver is non-persistent. Use `database`,
 Create a logout controller using `OidcService`:
 
 ```php
-public function logout(Request $request, OidcService $oidcService): JsonResponse
+public function logout(Request $request, OidcService $oidcService)
 {
     $user = $request->user();
     $oidcService->revokeAuthServerToken($user);
-    auth('api')->logout();
 
-    $data = ['message' => 'Logged out'];
+    Auth::guard('web')->logout();
+    $request->session()->invalidate();
+    $request->session()->regenerateToken();
+
     if ($oidcService->isOidcUser($user)) {
-        $data['logout_url'] = $oidcService->getSsoLogoutUrl();
+        return redirect($oidcService->getSsoLogoutUrl());
     }
 
-    return response()->json($data);
+    return redirect('/');
 }
 ```
 
@@ -283,16 +147,11 @@ Yes. Users can have OIDC only, password only, or both.
 
 Yes. When a user authenticates via OIDC for the first time, the package automatically creates a User record.
 
-### How long does the JWT token last?
-
-That's configured in your JWT package (`php-open-source-saver/jwt-auth`), not this package. Check `config/jwt.php`.
-
 ### Can I customize rate limits?
 
 Yes, in `.env`:
 
 ```env
-OIDC_RATE_LIMIT_EXCHANGE=20,1
 OIDC_RATE_LIMIT_REDIRECT=10,1
 OIDC_RATE_LIMIT_CALLBACK=20,1
 ```

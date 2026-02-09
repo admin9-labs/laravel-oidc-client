@@ -2,6 +2,32 @@
 
 All notable changes to `laravel-oidc-client` will be documented in this file.
 
+## v2.0.0 - 2026-02-09
+
+### Breaking Changes
+
+- **Removed SPA/JWT coupling**: The package no longer assumes a frontend SPA architecture
+  - Removed `frontend_url` config — replaced by `redirect_url` and `post_logout_redirect_url`
+  - Removed `exchange_code_ttl` config (one-time exchange codes no longer used)
+  - Removed `jwt_guard` config (JWT guard no longer needed)
+  - Removed `routes.api` config (no API routes)
+  - Removed `rate_limits.exchange` config
+  - Removed `POST /api/auth/exchange` endpoint
+  - Removed `OidcTokenExchanged` event
+- **Callback now creates a web session**: After successful OIDC authentication, the user is logged in via the web guard and redirected to `redirect_url` (default: `/dashboard`). Uses `redirect()->intended()` so any previously intended URL takes priority.
+- **Errors use flash data**: Authentication errors are now flashed to the session (`oidc_error`, `oidc_error_description`) instead of being passed as URL query parameters.
+
+### Migration Guide
+
+1. Replace `.env` variables:
+   - `OIDC_FRONTEND_URL` → `OIDC_REDIRECT_URL` (default: `/dashboard`)
+   - Add `OIDC_POST_LOGOUT_REDIRECT_URL` (default: `/`)
+2. Remove from `.env`: `OIDC_EXCHANGE_CODE_TTL`, `OIDC_JWT_GUARD`, `OIDC_RATE_LIMIT_EXCHANGE`
+3. Remove any frontend code that calls `POST /api/auth/exchange`
+4. Remove any listeners for `OidcTokenExchanged` event
+5. Update error handling: check `session('oidc_error')` instead of URL query parameters
+6. JWT package (`php-open-source-saver/jwt-auth`) is no longer required by this package
+
 ## v1.0.3 - 2026-02-08
 
 ### Changed
