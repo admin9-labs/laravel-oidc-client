@@ -2,7 +2,7 @@
 
 All notable changes to `laravel-oidc-client` will be documented in this file.
 
-## v2.0.0 - 2026-02-09
+## v1.1.0 - 2026-02-09
 
 ### Breaking Changes
 
